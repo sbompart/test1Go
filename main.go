@@ -2,65 +2,93 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
-//const strIn = "A0511AB398765UJ1N230200c11"
-var values []string
-
-func getType(str string) (string, error) {
-	if len(str) < 3 {
-		return "", errors.New("GetType - String must contain 3 chars min")
-	}
-	if  str[:1] != "N" && str[:1] != "A" {
-		return "", errors.New("GetType - First leter is not N or A")
-	}
-	return str[3:], nil
-}
-
-func getLenght(str string) (string, string, error) {
-	if len(str) < 2 {
-		return "", "", errors.New("GetLength - String must contain 2 chars min")
-	}
-	return str[:2], str[2:], nil
-}
-
-func getValue(str string, lgt int) (string, string, error) {
-	if len(str) < lgt {
-		return "", "", errors.New("GetValue - The value contains fewer characters than necessary.")
-	}
-	return str[:lgt], str[lgt:], nil
-}
-
-func loopForStr(str string) ([]string, error) {
-	if len(str) < 1 {
-		return nil, errors.New("Erorr empty string")
-	}
-
-	str, err := getType(str)
+func getTLVType(str string) (string, error) {
+	t, err := getTLVValue(str, 3)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	l, str, err := getLenght(str)
+	if t[0] != 'A' && t[0] != 'N' {
+		return "", errors.New("type invalid")
+	}
+	n := t[1:]
+	_, err = strconv.Atoi(n)
 	if err != nil {
-		values = values[:0]
-		return nil, err
+		return "", errors.New("type invalid number")
 	}
-
-	lgt, _ := strconv.Atoi(l)
-	v, str, err := getValue(str, lgt)
-	if err != nil {
-		values = values[:0]
-		return nil, err
-	}
-	values = append(values, v)
-	if len(str) == 0 {
-		return values, nil
-	}
-	return loopForStr(str)
+	return t, nil
 }
 
+func getTLVLength(str string) (string, error) {
+	l, err := getTLVValue(str, 2)
+	if err != nil {
+		return "", err
+	}
+	_, err = strconv.Atoi(l)
+	if err != nil {
+		return "", errors.New("length must be number")
+	}
+	return l, nil
+}
+
+func getTLVValue(str string, size int) (string, error) {
+	if len(str) < size {
+		return "", errors.New(fmt.Sprintf("string require min %d chars", size))
+	}
+	subStr := str[:size]
+	return subStr, nil
+}
+
+func processTLVStr(str string) ([]map[string]string, error) {
+	if str == "" {
+		return nil, errors.New("str is empty")
+	}
+
+	var tlvMap []map[string]string
+
+	var displaceStr = func(size int) {
+		str = str[size:]
+	}
+
+	for len(str) > 0 {
+		t, err := getTLVType(str)
+		if err != nil {
+			return nil, err
+		}
+		displaceStr(len(t))
+
+		l, err := getTLVLength(str)
+		if err != nil {
+			return nil, err
+		}
+		displaceStr(len(l))
+
+		size, err := strconv.Atoi(l)
+		if err != nil {
+			return nil, err
+		}
+
+		v, err := getTLVValue(str, size)
+		if err != nil {
+			return nil, err
+		}
+		displaceStr(len(v))
+
+		tlvMap = append(tlvMap, map[string]string{
+			"type":   t,
+			"length": l,
+			"value":  v,
+		})
+	}
+
+	return tlvMap, nil
+}
+
+// https://github.com/falabella-fif-inte/test-1
 func main() {
-	/*value, err := loopForStr(strIn)
-	fmt.Println("Result: ", value, err)*/
+	value, err := processTLVStr("A0511AB398765UJ1N230200")
+	fmt.Println(fmt.Sprintf("map: %+v error: %+v", value, err))
 }

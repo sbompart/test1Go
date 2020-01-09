@@ -7,146 +7,164 @@ import (
 	"testing"
 )
 
-func Test_GetType(t *testing.T) {
+func Test_GetTLVValue(t *testing.T) {
 	var tests = []struct {
 		caseName string
-		strVal string
-		want string
-		err error
+		str      string
+		size     int
+		want     string
+		err      error
 	}{
 		{
-			"GetType - String must contain 3 chars min",
+			"Success",
+			"A0511",
+			3,
+			"A05",
+			nil,
+		},
+		{
+			"Error",
+			"A0511",
+			8,
+			"",
+			errors.New("string require min 8 chars"),
+		},
+	}
+
+	for _, tt := range tests {
+		testname := fmt.Sprintf("%s", tt.caseName)
+		t.Run(testname, func(t *testing.T) {
+			subStr, err := getTLVValue(tt.str, tt.size)
+			if subStr != tt.want || !reflect.DeepEqual(err, tt.err) {
+				t.Errorf("got %s, want %s and error is %+v", subStr, tt.want, err)
+			}
+		})
+	}
+}
+
+func Test_GetTLVType(t *testing.T) {
+	var tests = []struct {
+		caseName string
+		str      string
+		tlvType  string
+		err      error
+	}{
+		{
+			"Success A",
+			"A05",
+			"A05",
+			nil,
+		},
+		{
+			"Success N",
+			"N06",
+			"N06",
+			nil,
+		},
+		{
+			"Error: require min 3 chars",
 			"A0",
 			"",
-			errors.New("GetType - String must contain 3 chars min"),
+			errors.New("string require min 3 chars"),
 		},
 		{
-			"GetType - First leter is not N or A",
-			"Z01",
+			"Error: unknown type",
+			"X05",
 			"",
-			errors.New("GetType - First leter is not N or A"),
+			errors.New("type invalid"),
 		},
+	}
+
+	for _, tt := range tests {
+		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.str)
+		t.Run(testname, func(t *testing.T) {
+			tlvType, err := getTLVType(tt.str)
+			if tlvType != tt.tlvType || !reflect.DeepEqual(err, tt.err) {
+				t.Errorf("got %s, want %s and error is %+v", tlvType, tt.tlvType, err)
+			}
+		})
+	}
+}
+
+func Test_GetTLVLength(t *testing.T) {
+	var tests = []struct {
+		caseName  string
+		str       string
+		tlvLength string
+		err       error
+	}{
 		{
-			"GetType - Success",
-			"A0111",
+			"Success",
+			"11",
 			"11",
 			nil,
 		},
+		{
+			"Error",
+			"1",
+			"",
+			errors.New("string require min 2 chars"),
+		},
 	}
 
 	for _, tt := range tests {
-		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.strVal)
+		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.str)
 		t.Run(testname, func(t *testing.T) {
-			tlvMap, err := getType(tt.strVal)
-			if !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(err, tt.err) {
-				t.Errorf("got %+v, want %+v and error is %+v", tlvMap, tt.want, err)
+			tlvLength, err := getTLVLength(tt.str)
+			if tlvLength != tt.tlvLength || !reflect.DeepEqual(err, tt.err) {
+				t.Errorf("got %s, want %s and error is %+v", tlvLength, tt.tlvLength, err)
 			}
 		})
 	}
 }
 
-func Test_GetLength(t *testing.T) {
+func Test_ProcessTLVStr(t *testing.T) {
 	var tests = []struct {
 		caseName string
-		strVal string
-		want, want2 string
-		err error
+		strVal   string
+		want     []map[string]string
+		err      error
 	}{
 		{
-			"GetLength - String must contain 2 chars min",
-			"0",
-			"", "",
-			errors.New("GetLength - String must contain 2 chars min"),
-		},
-		{
-			"GetLength - Success",
-			"11B2131",
-			"11", "B2131",
+			"Success",
+			"A0511AB398765UJ1N230200",
+			[]map[string]string{
+				{"type": "A05", "length": "11", "value": "AB398765UJ1"},
+				{"type": "N23", "length": "02", "value": "00"},
+			},
 			nil,
 		},
-	}
-
-	for _, tt := range tests {
-		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.strVal)
-		t.Run(testname, func(t *testing.T) {
-			tlvMap, tlvMap2, err := getLenght(tt.strVal)
-			if !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(tlvMap2, tt.want2) || !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(err, tt.err) {
-				t.Errorf("got %+v, want %+v, want2 %+v and error is %+v", tlvMap, tt.want, tlvMap2, err)
-			}
-		})
-	}
-}
-
-func Test_GetValue(t *testing.T) {
-	var tests = []struct {
-		caseName string
-		strVal string; lgt int
-		want, want2 string
-		err error
-	}{
 		{
-			"GetValue - Error",
-			"B12313", 9,
-			"", "",
-			errors.New("GetValue - The value contains fewer characters than necessary."),
-		},
-		{
-			"GetValue - Error",
-			"00N11", 2,
-			"00", "N11",
-			nil,
-		},
-	}
-
-	for _, tt := range tests {
-		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.strVal)
-		t.Run(testname, func(t *testing.T) {
-			tlvMap, tlvMap2, err := getValue(tt.strVal, tt.lgt)
-			if !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(tlvMap2, tt.want2) || !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(err, tt.err) {
-				t.Errorf("got %+v, want %+v, want2 %+v and error is %+v", tlvMap, tt.want, tlvMap2, err)
-			}
-		})
-	}
-}
-
-func Test_LoopForStr(t *testing.T) {
-	var tests = []struct {
-		caseName string
-		strVal string
-		want []string
-		err error
-	}{
-		{
-			"LoopForStr - Empty string",
+			"Error empty",
 			"",
 			nil,
-			errors.New("Erorr empty string"),
+			errors.New("str is empty"),
 		},
 		{
-			"LoopForStr - GetType error",
-			"A0",
+			"Error type",
+			"X0511AB398765UJ1N230200",
 			nil,
-			errors.New("GetType - String must contain 3 chars min"),
+			errors.New("type invalid"),
 		},
 		{
-			"LoopForStr - GetLength error",
-			"A020",
+			"Error type number",
+			"ABC11AB398765UJ1N230200",
 			nil,
-			errors.New("GetLength - String must contain 2 chars min"),
+			errors.New("type invalid number"),
 		},
 		{
-			"LoopForStr - GetValue error",
-			"A020300",
+			"Error length",
+			"A051AAB398765UJ1N230200",
 			nil,
-			errors.New("GetValue - The value contains fewer characters than necessary."),
+			errors.New("length must be number"),
 		},
 	}
 
 	for _, tt := range tests {
 		testname := fmt.Sprintf("%s: %s", tt.caseName, tt.strVal)
 		t.Run(testname, func(t *testing.T) {
-			tlvMap, err := loopForStr(tt.strVal)
-			if !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(err, tt.err) {
+			tlvMap, err := processTLVStr(tt.strVal)
+			if !reflect.DeepEqual(tlvMap, tt.want) || !reflect.DeepEqual(err, tt.err) {
 				t.Errorf("got %+v, want %+v and error is %+v", tlvMap, tt.want, err)
 			}
 		})
